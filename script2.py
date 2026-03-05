@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import base64
 from pathlib import Path
+from docx import Document
 
 # Page configuration
 st.set_page_config(
@@ -383,6 +384,65 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Navigation tabs - 5 Button Navbar from script1
+col1, col2, col3, col4, col5 = st.columns(5)
+with col1:
+    simulator_btn = st.button(
+        "Simulator",
+        use_container_width=True,
+        type="secondary"
+        if st.session_state.get("page", "Simulator") != "Simulator"
+        else "primary",
+    )
+with col2:
+    ref_btn = st.button(
+        "GRCS Reference",
+        use_container_width=True,
+        type="secondary"
+        if st.session_state.get("page", "Simulator") != "Reference"
+        else "primary",
+    )
+with col3:
+    doc_btn = st.button(
+        "Documentation",
+        use_container_width=True,
+        type="secondary"
+        if st.session_state.get("page", "Simulator") != "Documentation"
+        else "primary",
+    )
+with col4:
+    weight_btn = st.button(
+        "Weight Calc",
+        use_container_width=True,
+        type="secondary"
+        if st.session_state.get("page", "Simulator") != "Weight"
+        else "primary",
+    )
+with col5:
+    lusr_btn = st.button(
+        "LUSR Calc",
+        use_container_width=True,
+        type="secondary"
+        if st.session_state.get("page", "Simulator") != "LUSR"
+        else "primary",
+    )
+
+# Handle navigation button clicks
+if simulator_btn:
+    st.session_state.page = "Simulator"
+elif ref_btn:
+    st.session_state.page = "Reference"
+elif doc_btn:
+    st.session_state.page = "Documentation"
+elif weight_btn:
+    st.session_state.page = "Weight"
+elif lusr_btn:
+    st.session_state.page = "LUSR"
+
+# Initialize default page
+if "page" not in st.session_state:
+    st.session_state.page = "Simulator"
+
 # ==========================================
 # Application Configuration
 # ==========================================
@@ -415,68 +475,175 @@ authority_scores = {
 }
 
 # ==========================================
-# Main Application Logic
+# Module Render Functions
 # ==========================================
 
-results = []
-
-st.sidebar.header("Scenario Inputs")
-
-# Process each attribute
-for attribute, weight in weights.items():
+def render_simulator():
+    """Script 2's original simulator with sidebar inputs."""
+    st.sidebar.header("Scenario Inputs")
     
-    mi = st.sidebar.slider(
-        f"{attribute} Match Strength (Mi)",
-        0.0,
-        1.0,
-        1.0
+    results = []
+    
+    for attribute, weight in weights.items():
+        mi = st.sidebar.slider(
+            f"{attribute} Match Strength (Mi)",
+            0.0,
+            1.0,
+            1.0
+        )
+        
+        si = authority_scores[attribute] / 100
+        contribution = weight * mi * si
+        
+        results.append({
+            "Attribute": attribute,
+            "Weight": weight,
+            "Mi": mi,
+            "Si": si,
+            "Contribution": contribution
+        })
+    
+    df = pd.DataFrame(results)
+    ics_score = df["Contribution"].sum()
+    
+    st.subheader("Attribute Contribution")
+    st.dataframe(df, use_container_width=True)
+    
+    st.subheader("Identity Confidence Score")
+    st.metric("ICS", f"{round(ics_score * 100, 2)}%")
+    
+    if ics_score >= 0.92:
+        status = "Golden"
+        color = "green"
+    elif ics_score >= 0.75:
+        status = "Silver"
+        color = "orange"
+    else:
+        status = "Grey"
+        color = "red"
+    
+    st.markdown(f"## Record Classification: :{color}[{status}]")
+    
+    st.subheader("Contribution by Attribute")
+    st.bar_chart(df.set_index("Attribute")["Contribution"])
+
+
+def render_reference_table():
+    """GRCS Reference Table from Script 1."""
+    st.subheader("GRCS Reference Table")
+    
+    reference_data = [
+        {"Attribute": attr, "Weight": weight, "Authority": authority_scores[attr]}
+        for attr, weight in weights.items()
+    ]
+    ref_df = pd.DataFrame(reference_data)
+    st.dataframe(ref_df, use_container_width=True)
+    
+    st.info("This table shows all attributes with their weights and authority scores.")
+
+
+def render_technical_docs():
+    """Technical Documentation from Script 1."""
+    st.subheader("Technical Documentation")
+    
+    try:
+        doc_file = "data/GRCS_Technical_Documentation.docx"
+        if Path(doc_file).exists():
+            doc = Document(doc_file)
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    st.markdown(para.text)
+        else:
+            st.warning("DOCX file not found. Showing fallback content...")
+            st.markdown("""
+### GRCS Scoring Methodology
+
+**Formula:**
+```
+GRCS = Σ(Wi × Mi × Si) + Reinforcement - RiskAdjustment
+```
+
+Where:
+- **Wi** = Attribute Weight (%)
+- **Mi** = Match Strength (0-1)
+- **Si** = Source Trust (AuthorityScore/100)
+
+**Decision Thresholds:**
+- ≥ 92%: Auto Merge
+- 80-91%: Conditional Merge
+- 70-79%: Steward Assisted
+- 60-69%: Manual Review
+- < 60%: Create New Record
+            """)
+    except Exception as e:
+        st.error(f"Error loading documentation: {e}")
+
+
+def render_weight_calculation():
+    """Weight Calculation from Script 1."""
+    st.subheader("Weight Calculation (ACS Model)")
+    
+    st.markdown("### L, U, S, R Calculator")
+    st.caption("Formula: ACS = (0.35×L + 0.30×U + 0.20×S + 0.15×R)")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        l_value = st.slider("L (Legal)", 0, 10, 8)
+    with col2:
+        u_value = st.slider("U (Uniqueness)", 0, 10, 7)
+    with col3:
+        s_value = st.slider("S (Stability)", 0, 10, 8)
+    with col4:
+        r_value = st.slider("R (Risk)", 0, 10, 8)
+    
+    acs = (0.35 * l_value + 0.30 * u_value + 0.20 * s_value + 0.15 * r_value)
+    st.metric("ACS Score", f"{acs:.2f}")
+    st.caption("Use these factors to calculate attribute weights")
+
+
+def render_lusr_calculation():
+    """LUSR Calculation from Script 1."""
+    st.subheader("LUSR Calculation")
+    
+    st.markdown("### LUSR Index Calculator")
+    
+    lusr_l = st.slider("L (Legal Strength)", 0.0, 10.0, 8.0, 0.1)
+    lusr_u = st.slider("U (Uniqueness)", 0.0, 10.0, 7.0, 0.1)
+    lusr_s = st.slider("S (Stability)", 0.0, 10.0, 7.5, 0.1)
+    lusr_r = st.slider("R (Risk Impact)", 0.0, 10.0, 8.0, 0.1)
+    
+    lusr_score = (lusr_l + lusr_u + lusr_s + lusr_r) / 4
+    st.metric("LUSR Index", f"{lusr_score:.2f}/10")
+    st.progress(min(lusr_score / 10, 1.0))
+
+
+# ==========================================
+# Page Routing
+# ==========================================
+
+page = st.session_state.get("page", "Simulator")
+
+if page == "Simulator":
+    st.markdown(
+        """
+    <div class="page-header">
+        <h1>Citizen Golden Record Simulator</h1>
+        <p>Adjust identity attributes to see how the system classifies a citizen record.</p>
+    </div>
+    """,
+        unsafe_allow_html=True,
     )
-    
-    si = authority_scores[attribute] / 100
-    
-    contribution = weight * mi * si
-    
-    results.append({
-        "Attribute": attribute,
-        "Weight": weight,
-        "Mi": mi,
-        "Si": si,
-        "Contribution": contribution
-    })
+    render_simulator()
+elif page == "Reference":
+    render_reference_table()
+elif page == "Documentation":
+    render_technical_docs()
+elif page == "Weight":
+    render_weight_calculation()
+elif page == "LUSR":
+    render_lusr_calculation()
 
-# Create results dataframe
-df = pd.DataFrame(results)
-
-# Calculate Identity Confidence Score
-ICS = df["Contribution"].sum()
-
-# Display results
-st.subheader("Attribute Contribution")
-st.dataframe(df, use_container_width=True)
-
-st.subheader("Identity Confidence Score")
-st.metric("ICS", f"{round(ICS * 100, 2)}%")
-
-# ==========================================
-# Classification Logic
-# ==========================================
-if ICS >= 0.92:
-    status = "Golden"
-    color = "green"
-elif ICS >= 0.75:
-    status = "Silver"
-    color = "orange"
-else:
-    status = "Grey"
-    color = "red"
-
-st.markdown(f"## Record Classification: :{color}[{status}]")
-
-# Visualize contributions
-st.subheader("Contribution by Attribute")
-st.bar_chart(df.set_index("Attribute")["Contribution"])
-
-# Footer for deployment info
+# Footer
 st.markdown("---")
 st.caption(
     "Golden Record Confidence Score (GRCS) Simulator | "
