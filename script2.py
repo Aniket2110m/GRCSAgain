@@ -444,34 +444,72 @@ if "page" not in st.session_state:
     st.session_state.page = "Simulator"
 
 # ==========================================
-# Application Configuration
+# Application Configuration - Detailed from Script1
 # ==========================================
 
-# Attribute weights (simplified demo)
-weights = {
-    "Aadhaar": 0.18,
-    "Name": 0.09,
-    "DOB": 0.09,
-    "Address": 0.07,
-    "PAN": 0.05,
-    "Passport": 0.03,
-    "EPIC": 0.03,
-    "Ration Card": 0.05,
-    "Father Name": 0.04,
-    "Mobile": 0.04
+# Full 20-attribute reference data from Script 1
+REFERENCE_DATA = [
+    {"S.No": 1, "Attribute": "Aadhaar", "Weight (%)": 7.111274871, "Match Type": "Deterministic", "Enterprise Rule": "UIDAI biometric verified"},
+    {"S.No": 2, "Attribute": "Name", "Weight (%)": 4.605747973, "Match Type": "Fuzzy + Phonetic", "Enterprise Rule": "UIDAI > Civil Registry precedence"},
+    {"S.No": 3, "Attribute": "Date of Birth", "Weight (%)": 5.600589536, "Match Type": "Exact > Year", "Enterprise Rule": "Civil Registry override"},
+    {"S.No": 4, "Attribute": "Mobile Number", "Weight (%)": 4.532056006, "Match Type": "OTP Verified", "Enterprise Rule": "Aadhaar seeded + CBS timestamp"},
+    {"S.No": 5, "Attribute": "Gender", "Weight (%)": 4.679439941, "Match Type": "Exact", "Enterprise Rule": "Legal identity anchor"},
+    {"S.No": 6, "Attribute": "Father's Name", "Weight (%)": 5.011053795, "Match Type": "Fuzzy", "Enterprise Rule": "Civil Registry priority"},
+    {"S.No": 7, "Attribute": "Mother's Name", "Weight (%)": 5.011053795, "Match Type": "Fuzzy", "Enterprise Rule": "Civil Registry validated"},
+    {"S.No": 8, "Attribute": "Permanent Address", "Weight (%)": 4.56890199, "Match Type": "Geo-normalized", "Enterprise Rule": "UIDAI > Land Registry"},
+    {"S.No": 9, "Attribute": "Correspondence Address", "Weight (%)": 3.463522476, "Match Type": "Latest Timestamp", "Enterprise Rule": "CBS latest update"},
+    {"S.No": 10, "Attribute": "Caste", "Weight (%)": 5.342667649, "Match Type": "Certificate Verified", "Enterprise Rule": "RTPS validated"},
+    {"S.No": 11, "Attribute": "Marital Status", "Weight (%)": 4.237288136, "Match Type": "Registry Preferred", "Enterprise Rule": "Marriage Registry > Self"},
+    {"S.No": 12, "Attribute": "Education Status", "Weight (%)": 4.016212233, "Match Type": "Dept Certified", "Enterprise Rule": "Education DB"},
+    {"S.No": 13, "Attribute": "Employment Status", "Weight (%)": 3.831982314, "Match Type": "Statutory", "Enterprise Rule": "Labour Dept verified"},
+    {"S.No": 14, "Attribute": "Ration Card Number", "Weight (%)": 5.490051584, "Match Type": "Deterministic", "Enterprise Rule": "PDS Household anchor"},
+    {"S.No": 15, "Attribute": "Ration Card Type", "Weight (%)": 4.089042, "Match Type": "Exact", "Enterprise Rule": "Welfare classification"},
+    {"S.No": 16, "Attribute": "PAN ID", "Weight (%)": 6.632277082, "Match Type": "Deterministic", "Enterprise Rule": "Income Tax authority"},
+    {"S.No": 17, "Attribute": "Bank Account", "Weight (%)": 5.711127487, "Match Type": "Masked Deterministic", "Enterprise Rule": "CBS source-of-origin"},
+    {"S.No": 18, "Attribute": "Land Ownership", "Weight (%)": 6.042741341, "Match Type": "Legal Title", "Enterprise Rule": "Land Registry override"},
+    {"S.No": 19, "Attribute": "Motor Ownership", "Weight (%)": 5.416359617, "Match Type": "Registration Match", "Enterprise Rule": "VAHAN verified"},
+    {"S.No": 20, "Attribute": "Nationality", "Weight (%)": 4.605747973, "Match Type": "Legal", "Enterprise Rule": "Civil Registry"},
+]
+
+# Extended source authorities (for reference)
+SOURCE_AUTHORITY = {
+    "UIDAI": 85,
+    "Civil Registry": 80,
+    "RTPS Certified": 82,
+    "Income Tax": 78,
+    "Bank CBS": 78,
+    "Land Registry": 75,
+    "Transport Registry": 75,
+    "PDS": 70,
+    "Survey DB": 45,
+    "Self Declared": 20,
 }
 
+# LUSR Table 6 - Attribute Scoring Matrix
+LUSR_TABLE_6 = [
+    {"S.No": 1, "Attribute": "Aadhaar", "L": 10, "U": 10, "S": 9, "R": 9, "ACL": 9.65},
+    {"S.No": 2, "Attribute": "Name", "L": 7, "U": 5, "S": 7, "R": 6, "ACL": 6.25},
+    {"S.No": 3, "Attribute": "Date of Birth", "L": 8, "U": 6, "S": 9, "R": 8, "ACL": 7.6},
+    {"S.No": 4, "Attribute": "Mobile Number", "L": 6, "U": 6, "S": 6, "R": 7, "ACL": 6.15},
+    {"S.No": 5, "Attribute": "Gender", "L": 7, "U": 4, "S": 9, "R": 6, "ACL": 6.35},
+    {"S.No": 6, "Attribute": "PAN ID", "L": 9, "U": 9, "S": 9, "R": 9, "ACL": 9.0},
+]
+
+# Legacy simplified weights (backup for compatibility)
+weights = {item["Attribute"]: item["Weight (%)"] / 100 for item in REFERENCE_DATA[:10]}
+
+# Attribute authority scores (maps attributes to their authority scores)
 authority_scores = {
     "Aadhaar": 85,
     "Name": 80,
-    "DOB": 80,
-    "Address": 70,
-    "PAN": 78,
-    "Passport": 78,
-    "EPIC": 75,
-    "Ration Card": 70,
-    "Father Name": 70,
-    "Mobile": 70
+    "Date of Birth": 80,
+    "Mobile Number": 78,
+    "Gender": 80,
+    "Father's Name": 70,
+    "Mother's Name": 70,
+    "Permanent Address": 75,
+    "Correspondence Address": 70,
+    "Caste": 82,
 }
 
 # ==========================================
@@ -529,92 +567,353 @@ def render_simulator():
 
 
 def render_reference_table():
-    """GRCS Reference Table from Script 1."""
-    st.subheader("GRCS Reference Table")
+    """Display comprehensive reference table with all 20 attributes."""
+    st.header("📊 GRCS Reference Table")
     
-    reference_data = [
-        {"Attribute": attr, "Weight": weight, "Authority": authority_scores[attr]}
-        for attr, weight in weights.items()
-    ]
-    ref_df = pd.DataFrame(reference_data)
-    st.dataframe(ref_df, use_container_width=True)
+    # Create DataFrame from REFERENCE_DATA
+    df = pd.DataFrame(REFERENCE_DATA)
     
-    st.info("This table shows all attributes with their weights and authority scores.")
+    # Display statistics
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Attributes", len(df))
+    with col2:
+        st.metric("Total Weight %", f"{df['Weight (%)'].sum():.2f}%")
+    with col3:
+        max_attr = df.loc[df['Weight (%)'].idxmax()]
+        st.metric("Max Weight Attribute", max_attr['Attribute'])
+    with col4:
+        st.metric("Avg Weight %", f"{df['Weight (%)'].mean():.2f}%")
+    
+    st.divider()
+    
+    # Display full table
+    st.subheader("Complete Attribute Reference")
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "S.No": st.column_config.NumberColumn("S.No", width="small"),
+            "Attribute": st.column_config.TextColumn("Attribute", width="medium"),
+            "Weight (%)": st.column_config.NumberColumn("Weight (%)", format="%.2f", width="small"),
+            "Match Type": st.column_config.TextColumn("Match Type", width="medium"),
+            "Enterprise Rule": st.column_config.TextColumn("Enterprise Rule", width="large"),
+        }
+    )
+    
+    # CSV Download
+    csv_data = df.to_csv(index=False)
+    st.download_button(
+        label="📥 Download CSV",
+        data=csv_data,
+        file_name="GRCS_Reference_Table.csv",
+        mime="text/csv"
+    )
+    
+    # Filter by weight
+    st.subheader("Filter by Weight Range")
+    min_weight, max_weight = st.slider(
+        "Select weight range (%)",
+        min_value=float(df['Weight (%)'].min()),
+        max_value=float(df['Weight (%)'].max()),
+        value=(float(df['Weight (%)'].min()), float(df['Weight (%)'].max())),
+        step=0.5
+    )
+    
+    filtered_df = df[(df['Weight (%)'] >= min_weight) & (df['Weight (%)'] <= max_weight)]
+    st.info(f"Showing {len(filtered_df)} attributes in selected range")
+    st.dataframe(filtered_df, use_container_width=True, hide_index=True)
 
 
 def render_technical_docs():
-    """Technical Documentation from Script 1."""
-    st.subheader("Technical Documentation")
+    """Enhanced technical documentation with DOCX reading and comprehensive fallback."""
+    st.header("📚 Technical Documentation")
     
-    try:
-        doc_file = "data/GRCS_Technical_Documentation.docx"
-        if Path(doc_file).exists():
-            doc = Document(doc_file)
-            for para in doc.paragraphs:
-                if para.text.strip():
-                    st.markdown(para.text)
-        else:
-            st.warning("DOCX file not found. Showing fallback content...")
+    tabs = st.tabs(["Overview", "Authority Index", "Decision Engine", "Match Strength"])
+    
+    with tabs[0]:
+        try:
+            doc_file = "data/GRCS_Technical_Documentation.docx"
+            if Path(doc_file).exists():
+                doc = Document(doc_file)
+                for para in doc.paragraphs:
+                    if para.text.strip():
+                        st.markdown(para.text)
+            else:
+                raise FileNotFoundError("DOCX not available")
+        except:
             st.markdown("""
-### GRCS Scoring Methodology
+            ### GRCS - Global Record Consolidation System
 
-**Formula:**
-```
-GRCS = Σ(Wi × Mi × Si) + Reinforcement - RiskAdjustment
-```
+            **Objective:** Establish a unified master identity record by consolidating records from multiple heterogeneous data sources while maintaining data integrity and traceability.
 
-Where:
-- **Wi** = Attribute Weight (%)
-- **Mi** = Match Strength (0-1)
-- **Si** = Source Trust (AuthorityScore/100)
+            **Core Formula:**
+            ```
+            GRCS = Σ(Wi × Mi × Si) + Reinforcement - RiskAdjustment
+            ```
 
-**Decision Thresholds:**
-- ≥ 92%: Auto Merge
-- 80-91%: Conditional Merge
-- 70-79%: Steward Assisted
-- 60-69%: Manual Review
-- < 60%: Create New Record
+            Where:
+            - **Wi** = Attribute Weight (%) - Based on deterministic power
+            - **Mi** = Match Strength (0-1) - Fuzzy/Exact match confidence
+            - **Si** = Source Trust Factor - AuthorityScore/100
+            - **Reinforcement** = Additional points (0-5) for corroborating attributes
+            - **RiskAdjustment** = Penalty for suspicious patterns
+
+            **Calculation Scope:**
+            1. Compute pairwise GRCS for each record pair
+            2. Normalize to 0-100 scale
+            3. Apply decision thresholds
+            4. Log all matches with rationale
             """)
-    except Exception as e:
-        st.error(f"Error loading documentation: {e}")
+    
+    with tabs[1]:
+        st.markdown("### Authority Index - Source Credibility Scores")
+        auth_df = pd.DataFrame(list(SOURCE_AUTHORITY.items()), columns=["Data Source", "Authority Score"])
+        st.dataframe(auth_df, use_container_width=True, hide_index=True)
+        st.markdown("""
+        **Authority Categories:**
+        - **85+**: Biometrically verified or legally issued IDs (UIDAI, Civil Registry)
+        - **78-82**: Statutory records with regular audit trails (Income Tax, Bank CBS)
+        - **70-75**: Registered entities with government backing (Land Registry, Transport)
+        - **45-70**: Administrative registries (PDS, Survey Data)
+        - **20**: Self-declared information with no verification
+        """)
+    
+    with tabs[2]:
+        st.markdown("### Decision Engine - Match Thresholds")
+        thresholds_df = pd.DataFrame([
+            {"GRCS Score Range": "≥ 92%", "Decision": "✅ Auto Merge", "Confidence": "Very High"},
+            {"GRCS Score Range": "80-91%", "Decision": "⚠️ Conditional Merge", "Confidence": "High"},
+            {"GRCS Score Range": "70-79%", "Decision": "👤 Steward Assisted", "Confidence": "Medium"},
+            {"GRCS Score Range": "60-69%", "Decision": "🔍 Manual Review", "Confidence": "Low"},
+            {"GRCS Score Range": "< 60%", "Decision": "❌ Create New Record", "Confidence": "Very Low"},
+        ])
+        st.dataframe(thresholds_df, use_container_width=True, hide_index=True)
+    
+    with tabs[3]:
+        st.markdown("### Match Strength Model (M-Values)")
+        match_strength_df = pd.DataFrame([
+            {"Match Type": "Deterministic (Aadhaar)", "M-Value": "1.0", "Example": "Aadhaar number exact match"},
+            {"Match Type": "Legal Match", "M-Value": "0.95", "Example": "PAN, Land Registry"},
+            {"Match Type": "Fuzzy + Phonetic", "M-Value": "0.85", "Example": "Name with tolerance → 85%"},
+            {"Match Type": "Geo-normalized", "M-Value": "0.80", "Example": "Address match after normalizing"},
+            {"Match Type": "Year Match (DOB)", "M-Value": "0.70", "Example": "Birth year only, day/month differ"},
+            {"Match Type": "OTP Verified", "M-Value": "0.90", "Example": "Mobile OTP authenticated"},
+            {"Match Type": "Partial Match", "M-Value": "0.60", "Example": "First name + initials"},
+            {"Match Type": "No Match", "M-Value": "0.0", "Example": "Completely different values"},
+        ])
+        st.dataframe(match_strength_df, use_container_width=True, hide_index=True)
 
 
 def render_weight_calculation():
-    """Weight Calculation from Script 1."""
-    st.subheader("Weight Calculation (ACS Model)")
+    """Enhanced weight calculation with LUSR Table 6 integration."""
+    st.header("⚖️ Weight Calculation (ACS Model)")
     
-    st.markdown("### L, U, S, R Calculator")
-    st.caption("Formula: ACS = (0.35×L + 0.30×U + 0.20×S + 0.15×R)")
+    st.markdown("### Attribute-Level ACS Calculation")
+    st.caption("**Formula:** ACS = (0.35×L + 0.30×U + 0.20×S + 0.15×R)")
+    
+    # Reference table
+    st.subheader("LUSR Table 6 - Attribute Scoring Reference")
+    lusr6_df = pd.DataFrame(LUSR_TABLE_6)
+    st.dataframe(lusr6_df, use_container_width=True, hide_index=True)
+    
+    st.divider()
+    
+    # Interactive calculator
+    st.subheader("Interactive ACS Calculator")
+    
+    selected_attribute = st.selectbox(
+        "Select Attribute",
+        [item["Attribute"] for item in LUSR_TABLE_6]
+    )
+    
+    attr_data = next(item for item in LUSR_TABLE_6 if item["Attribute"] == selected_attribute)
     
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        l_value = st.slider("L (Legal)", 0, 10, 8)
-    with col2:
-        u_value = st.slider("U (Uniqueness)", 0, 10, 7)
-    with col3:
-        s_value = st.slider("S (Stability)", 0, 10, 8)
-    with col4:
-        r_value = st.slider("R (Risk)", 0, 10, 8)
     
-    acs = (0.35 * l_value + 0.30 * u_value + 0.20 * s_value + 0.15 * r_value)
-    st.metric("ACS Score", f"{acs:.2f}")
-    st.caption("Use these factors to calculate attribute weights")
+    with col1:
+        l_value = st.slider(
+            "L (Legal) ▶ Deterministic Power",
+            0, 10, attr_data["L"],
+            help="How deterministic/legally binding is this attribute?"
+        )
+    
+    with col2:
+        u_value = st.slider(
+            "U (Uniqueness) ▶ Distinguishing",
+            0, 10, attr_data["U"],
+            help="How unique is this attribute across population?"
+        )
+    
+    with col3:
+        s_value = st.slider(
+            "S (Stability) ▶ Temporal Invariance",
+            0, 10, attr_data["S"],
+            help="Does this attribute remain stable over years?"
+        )
+    
+    with col4:
+        r_value = st.slider(
+            "R (Risk) ▶ Fraud Susceptibility",
+            0, 10, attr_data["R"],
+            help="How easily can this be forged/manipulated?"
+        )
+    
+    # ACS Calculation
+    acs_score = (0.35 * l_value + 0.30 * u_value + 0.20 * s_value + 0.15 * r_value)
+    
+    metric_col1, metric_col2, metric_col3 = st.columns(3)
+    with metric_col1:
+        st.metric("Calculated ACS", f"{acs_score:.2f}/10.0")
+    with metric_col2:
+        st.metric("Reference ACL", f"{attr_data['ACL']}/10.0")
+    with metric_col3:
+        variance = abs(acs_score - attr_data['ACL'])
+        st.metric("Variance", f"{variance:.2f}", delta=f"{'-' if variance < 0.5 else '+'}{variance:.2f}" )
+    
+    # Visual feedback
+    st.progress(min(acs_score / 10, 1.0))
+    
+    # Interpretation
+    if acs_score >= 9.0:
+        st.success("⭐ Excellent discriminating power - Highest weight in GRCS")
+    elif acs_score >= 7.0:
+        st.info("✅ Good discriminating power - Highly reliable")
+    elif acs_score >= 5.0:
+        st.warning("⚠️ Moderate discriminating power - Use with other attributes")
+    else:
+        st.error("❌ Low discriminating power - Limited value in matching")
 
 
 def render_lusr_calculation():
-    """LUSR Calculation from Script 1."""
-    st.subheader("LUSR Calculation")
+    """Enhanced LUSR calculation with detailed reference tables."""
+    st.header("📊 LUSR Index Calculation")
     
-    st.markdown("### LUSR Index Calculator")
+    tabs = st.tabs(["Calculator", "Table 6 Reference", "Table 7 Scoring"])
     
-    lusr_l = st.slider("L (Legal Strength)", 0.0, 10.0, 8.0, 0.1)
-    lusr_u = st.slider("U (Uniqueness)", 0.0, 10.0, 7.0, 0.1)
-    lusr_s = st.slider("S (Stability)", 0.0, 10.0, 7.5, 0.1)
-    lusr_r = st.slider("R (Risk Impact)", 0.0, 10.0, 8.0, 0.1)
+    with tabs[0]:
+        st.markdown("### LUSR Index Interactive Calculator")
+        st.caption("Compute composite LUSR index for attribute assessment")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            lusr_l = st.slider(
+                "L (Legal Strength)",
+                0.0, 10.0, 8.5, 0.1,
+                help="Deterministic and legal power of attribute"
+            )
+        
+        with col2:
+            lusr_u = st.slider(
+                "U (Uniqueness)",
+                0.0, 10.0, 8.0, 0.1,
+                help="Distinguishing capability in population"
+            )
+        
+        with col3:
+            lusr_s = st.slider(
+                "S (Stability)",
+                0.0, 10.0, 8.5, 0.1,
+                help="Temporal stability over lifetime"
+            )
+        
+        with col4:
+            lusr_r = st.slider(
+                "R (Risk Impact)",
+                0.0, 10.0, 8.0, 0.1,
+                help="Fraud/manipulation susceptibility"
+            )
+        
+        lusr_index = (lusr_l + lusr_u + lusr_s + lusr_r) / 4
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("LUSR Index (Average)", f"{lusr_index:.2f}/10.0")
+        with col2:
+            st.metric("Normalized Score", f"{(lusr_index/10)*100:.1f}%")
+        
+        st.progress(min(lusr_index / 10, 1.0))
+        
+        # Breakdown
+        st.subheader("Component Breakdown")
+        breakdown_df = pd.DataFrame([
+            {"Component": "Legal", "Score": f"{lusr_l:.1f}", "Weight": "25%"},
+            {"Component": "Uniqueness", "Score": f"{lusr_u:.1f}", "Weight": "25%"},
+            {"Component": "Stability", "Score": f"{lusr_s:.1f}", "Weight": "25%"},
+            {"Component": "Risk", "Score": f"{lusr_r:.1f}", "Weight": "25%"},
+        ])
+        st.bar_chart(breakdown_df.set_index("Component")["Score"].astype(float))
     
-    lusr_score = (lusr_l + lusr_u + lusr_s + lusr_r) / 4
-    st.metric("LUSR Index", f"{lusr_score:.2f}/10")
-    st.progress(min(lusr_score / 10, 1.0))
+    with tabs[1]:
+        st.markdown("### LUSR Table 6 - Attribute Scoring Reference")
+        st.markdown("""
+        This table provides the L, U, S, R scores for each attribute and their 
+        composite ACL (Attribute Credibility Level), used as reference values 
+        in the weight calculation system.
+        """)
+        
+        lusr6_df = pd.DataFrame(LUSR_TABLE_6)
+        st.dataframe(lusr6_df, use_container_width=True, hide_index=True)
+        
+        # Statistics
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Avg L Score", f"{lusr6_df['L'].mean():.2f}")
+        with col2:
+            st.metric("Avg U Score", f"{lusr6_df['U'].mean():.2f}")
+        with col3:
+            st.metric("Avg S Score", f"{lusr6_df['S'].mean():.2f}")
+        with col4:
+            st.metric("Avg R Score", f"{lusr6_df['R'].mean():.2f}")
+    
+    with tabs[2]:
+        st.markdown("### LUSR Table 7 - Scoring Dimension Reference")
+        st.markdown("""
+        Comprehensive scoring dimensions explaining the L-U-S-R model 
+        and interpretation thresholds for attribute quality assessment.
+        """)
+        
+        lusr7_df = pd.DataFrame([
+            {
+                "Dimension": "Legal (L)",
+                "Description": "Deterministic power & legal binding nature",
+                "Scoring Range": "0-10",
+                "Characteristics": "Statutory ID > Certificate > Self-declared"
+            },
+            {
+                "Dimension": "Uniqueness (U)",
+                "Description": "Distinguishing capability in population",
+                "Scoring Range": "0-10",
+                "Characteristics": "Aadhaar: 10 (1.3B unique) → Father Name: 5"
+            },
+            {
+                "Dimension": "Stability (S)",
+                "Description": "Temporal invariance over lifespan",
+                "Scoring Range": "0-10",
+                "Characteristics": "Aadhaar/PAN: 9 → Address: 4 (volatile)"
+            },
+            {
+                "Dimension": "Risk (R)",
+                "Description": "Susceptibility to fraud/manipulation",
+                "Scoring Range": "0-10",
+                "Characteristics": "Aadhaar: 9 (biometric) → Address: 3 (easily forged)"
+            },
+        ])
+        
+        st.dataframe(lusr7_df, use_container_width=True, hide_index=True)
+        
+        st.divider()
+        
+        st.markdown("### Quality Thresholds")
+        thresholds_df = pd.DataFrame([
+            {"LUSR Index": "8.5-10.0", "Quality": "🟢 Excellent", "Weight Assignment": "May increase from base"},
+            {"LUSR Index": "7.0-8.4", "Quality": "🟢 Good", "Weight Assignment": "Standard (use base weight)"},
+            {"LUSR Index": "5.0-6.9", "Quality": "🟡 Moderate", "Weight Assignment": "May decrease by 10-20%"},
+            {"LUSR Index": "0.0-4.9", "Quality": "🔴 Poor", "Weight Assignment": "May decrease by 30-50%"},
+        ])
+        st.dataframe(thresholds_df, use_container_width=True, hide_index=True)
 
 
 # ==========================================
