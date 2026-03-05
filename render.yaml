@@ -2,13 +2,11 @@ services:
   - type: web
     name: grcs-simulator
     env: python
+    runtime: python-3.11.0
     region: oregon
     plan: free
     branch: main
     buildCommand: |
-      pip install --upgrade pip
+      pip install --upgrade pip setuptools wheel
       pip install -r requirements.txt
     startCommand: streamlit run script2.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
